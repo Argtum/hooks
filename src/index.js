@@ -1,27 +1,82 @@
-import React, { useState } from 'react';
+import React, {useEffect, useState, useCallback, useMemo} from 'react';
 import ReactDOM from 'react-dom';
 
 const App = () => {
-  return (
-    <div>
-      <HookSwitcher />
-    </div>
-  );
+  const [value, setValue] = useState(1);
+  const [visible, setVisible] = useState(true);
+
+  if (visible) {
+    return (
+      <div>
+        <button onClick={() => setValue((v) => v + 1)} >+</button>
+        <button onClick={() => setVisible(false)} >hide</button>
+        <PlanetInfo id={value} />
+      </div>
+    );
+  } else {
+    return <button onClick={() => setVisible(true)} >show</button>
+  }
 };
 
-const HookSwitcher = () => {
+const getPlanet = (id) => {
+  return fetch(`http://swapi.dev/api/planets/${id}`)
+    .then(res => res.json())
+    .then(data =>  data);
+};
 
-  const [color, setColor] = useState('gray');
-  const [fontSize, setFontSize] = useState(14);
+const useRequest = (request) => {
+  const initialState = useMemo(() => ({
+    data: null,
+    loading: true,
+    error: null
+  }), []);
+
+  const [dataState, setDataState] = useState(initialState);
+
+  useEffect(() => {
+    setDataState(initialState)
+    let cancelled = false;
+
+    request()
+      .then(data => !cancelled && setDataState({
+        data,
+        loading: false,
+        error: null
+      }))
+      .catch(error => !cancelled && setDataState({
+        data: null,
+        loading: false,
+        error
+      }))
+
+    return () => cancelled = true;
+  }, [request, initialState]);
+
+  return dataState;
+};
+
+const usePlanetInfo = (id) => {
+  const request = useCallback(() => getPlanet(id), [id]);
+
+  return useRequest(request);
+};
+
+const PlanetInfo = ({id}) => {
+  const { data, loading, error } = usePlanetInfo(id);
+
+  if (error) {
+    return <div>Something is wrong</div>
+  }
+
+  if (loading) {
+    return <div>loading ... </div>
+  }
 
   return (
-    <div style={{ padding: '10px', backgroundColor: color, fontSize: `${fontSize}px`}}>
-      Hello world
-      <button onClick={() => setColor('gray')}>Dark</button>
-      <button onClick={() => setColor('white')}>Light</button>
-      <button onClick={() => setFontSize((s) => s + 2)}>+</button>
-    </div>
-  );
-} ;
+   <div>
+     {id} - {data.name}
+   </div>
+ )
+};
 
 ReactDOM.render(<App />, document.getElementById('root'));
